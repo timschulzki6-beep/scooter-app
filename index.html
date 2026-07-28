@@ -1,223 +1,113 @@
-<!DOCTYPE html>
-<html lang="de">
+
+   <!DOCTYPE html>
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scooter Steuerung</title>
-<style>
-  body {
-    font-family: -apple-system, sans-serif;
-    background: #111;
-    color: #eee;
-    text-align: center;
-    padding: 30px 16px;
-    margin: 0;
-  }
-  h1 { font-size: 22px; margin-bottom: 20px; }
-  h2 { font-size: 16px; margin: 30px 0 10px; color: #999; text-align: left; }
-  button {
-    font-size: 16px;
-    padding: 14px 18px;
-    border-radius: 12px;
-    border: none;
-    margin: 6px;
-    cursor: pointer;
-    width: 44%;
-  }
-  .full { width: 92%; }
-  .blue { background: #2d7dfd; color: white; }
-  .green { background: #2ecc71; color: white; }
-  .orange { background: #f39c12; color: white; }
-  .red { background: #e74c3c; color: white; }
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    text-align: left;
-    background: #1c1c1c;
-    padding: 16px;
-    border-radius: 12px;
-    margin-top: 10px;
-  }
-  .grid div.label { color: #999; font-size: 13px; }
-  .grid div.value { font-size: 20px; font-weight: bold; }
-  #log {
-    margin-top: 20px;
-    padding: 12px;
-    background: #222;
-    border-radius: 10px;
-    font-size: 12px;
-    text-align: left;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 150px;
-    overflow-y: auto;
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ninebot E3 Pro Tuning</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #1a1a2e;
+            font-family: Arial, sans-serif;
+        }
+        button {
+            font-size: 22px;
+            padding: 18px 40px;
+            margin: 8px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 80%;
+            max-width: 300px;
+            color: white;
+            font-weight: bold;
+        }
+        #connectBtn { background: #00d2ff; }
+        #speed25Btn { background: #f39c12; }
+        #speed30Btn { background: #e74c3c; }
+        #panicBtn { background: #2ecc71; }
+        #log {
+            margin-top: 20px;
+            color: white;
+            background: #2d2d44;
+            padding: 15px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 300px;
+            min-height: 150px;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            overflow-y: auto;
+        }
+        h1 { color: white; }
+    </style>
 </head>
 <body>
+    <h1>⚡ Ninebot Tuning</h1>
+    <button id="connectBtn">🔗 Verbinden mit Ninebot</button>
+    <button id="speed25Btn">⚡ 25 km/h</button>
+    <button id="speed30Btn">⚡ 30 km/h</button>
+    <button id="panicBtn">🔙 Panic (20 km/h)</button>
+    <div id="log">Bereit...</div>
 
-  <h1>🛴 Scooter Steuerung</h1>
+    <script>
+        let characteristic = null;
 
-  <button id="connectBtn" class="blue full">Mit Scooter verbinden</button>
+        function log(msg) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += '<br>➜ ' + msg;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
 
-  <h2>Werte</h2>
-  <button id="refreshBtn" class="green full" disabled>Werte aktualisieren</button>
-  <div class="grid">
-    <div class="label">Akku</div><div class="value" id="valBattery">–</div>
-    <div class="label">Geschwindigkeit</div><div class="value" id="valSpeed">–</div>
-    <div class="label">Kilometerstand</div><div class="value" id="valMileage">–</div>
-    <div class="label">Temperatur</div><div class="value" id="valTemp">–</div>
-  </div>
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            try {
+                log('🔍 Suche nach Geräten...');
+                // Wichtig: acceptAllDevices statt eines Namensfilters,
+                // damit ALLE Bluetooth-Geräte in der Auswahl erscheinen
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
+                log('✅ Gefunden: ' + device.name);
 
-  <h2>Licht</h2>
-  <button id="lightOnBtn" class="orange" disabled>Licht an</button>
-  <button id="lightOffBtn" class="orange" disabled>Licht aus</button>
+                const server = await device.gatt.connect();
+                log('✅ Verbunden!');
 
-  <h2>Sperren</h2>
-  <button id="lockBtn" class="red" disabled>Sperren</button>
-  <button id="unlockBtn" class="green" disabled>Entsperren</button>
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                log('✅ Service & Characteristic gefunden!');
+                log('✅ Bereit für Geschwindigkeits-Befehle!');
+            } catch (error) {
+                log('❌ Fehler: ' + error);
+            }
+        });
 
-  <h2>Fahrmodus</h2>
-  <button id="modeNormalBtn" class="blue" disabled>Normal</button>
-  <button id="modeEcoBtn" class="blue" disabled>Eco</button>
-  <button id="modeSportBtn" class="blue full" disabled>Sport</button>
+        async function setSpeed(kmh) {
+            log('⚡ Setze auf ' + kmh + ' km/h...');
+            if (!characteristic) {
+                log('❌ Bitte zuerst verbinden!');
+                return;
+            }
+            try {
+                const speedCmd = new Uint8Array([0x5A, 0x01, 0x00, kmh]);
+                await characteristic.writeValue(speedCmd);
+                log('✅ Befehl für ' + kmh + ' km/h gesendet!');
+            } catch (error) {
+                log('❌ Fehler: ' + error);
+            }
+        }
 
-  <div id="log">Noch nicht verbunden.</div>
-
-<script>
-  const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-  const WRITE_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // schreiben zum Scooter
-  const NOTIFY_UUID   = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // Antworten vom Scooter
-
-  const SRC_BLE = 0x21;
-  const DST_ESC = 0x20;
-
-  let writeChar, notifyChar;
-  let resolveResponse = null;
-
-  const logEl = document.getElementById("log");
-  function log(text) {
-    logEl.textContent += "\n" + text;
-    logEl.scrollTop = logEl.scrollHeight;
-  }
-
-  function enableButtons() {
-    ["refreshBtn","lightOnBtn","lightOffBtn","lockBtn","unlockBtn",
-     "modeNormalBtn","modeEcoBtn","modeSportBtn"].forEach(id => {
-      document.getElementById(id).disabled = false;
-    });
-  }
-
-  // Baut ein Datenpaket nach dem Ninebot-Protokoll
-  function buildPacket(cmd, arg, payload = []) {
-    const body = [SRC_BLE, DST_ESC, cmd, arg, ...payload];
-    let sum = 0;
-    body.forEach(b => sum += b);
-    const checksum = 0xFFFF ^ (sum & 0xFFFF);
-    const packet = [0x5A, 0xA5, payload.length, ...body,
-                     checksum & 0xFF, (checksum >> 8) & 0xFF];
-    return new Uint8Array(packet);
-  }
-
-  // Liest ein oder mehrere 16-bit Register ab Adresse "offset"
-  async function readRegister(offset, wordCount = 1) {
-    const packet = buildPacket(0x01, offset, [wordCount]);
-    return await sendAndWait(packet);
-  }
-
-  // Schreibt ein 16-bit Register
-  async function writeRegister(offset, value) {
-    const payload = [value & 0xFF, (value >> 8) & 0xFF];
-    const packet = buildPacket(0x03, offset, payload);
-    await writeChar.writeValue(packet);
-  }
-
-  function sendAndWait(packet) {
-    return new Promise(async (resolve) => {
-      resolveResponse = resolve;
-      await writeChar.writeValue(packet);
-      setTimeout(() => resolve(null), 1500); // Timeout falls keine Antwort kommt
-    });
-  }
-
-  function handleNotify(event) {
-    const data = new Uint8Array(event.target.value.buffer);
-    log("Antwort: " + Array.from(data).map(b => b.toString(16).padStart(2,"0")).join(" "));
-    if (resolveResponse) {
-      resolveResponse(data);
-      resolveResponse = null;
-    }
-  }
-
-  // Extrahiert einen 16-bit Wert (little endian) aus der Antwort ab Position "pos"
-  function readInt16(data, pos) {
-    if (!data || data.length < pos + 2) return null;
-    let val = data[pos] | (data[pos+1] << 8);
-    if (val > 32767) val -= 65536; // signed
-    return val;
-  }
-
-  document.getElementById("connectBtn").addEventListener("click", async () => {
-    try {
-      log("Suche nach Geräten...");
-      const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [SERVICE_UUID]
-      });
-      log("Gerät gefunden: " + device.name);
-
-      const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
-      writeChar = await service.getCharacteristic(WRITE_UUID);
-      notifyChar = await service.getCharacteristic(NOTIFY_UUID);
-
-      await notifyChar.startNotifications();
-      notifyChar.addEventListener("characteristicvaluechanged", handleNotify);
-
-      log("Verbunden. Bereit für Befehle.");
-      enableButtons();
-    } catch (error) {
-      log("Fehler: " + error);
-    }
-  });
-
-  document.getElementById("refreshBtn").addEventListener("click", async () => {
-    try {
-      // Register-Adressen laut Ninebot-Protokoll (ES-Serie)
-      let resp = await readRegister(0x22, 1); // Akku %
-      const battery = readInt16(resp, 7);
-      document.getElementById("valBattery").textContent = battery !== null ? battery + " %" : "–";
-
-      resp = await readRegister(0x26, 1); // Geschwindigkeit 0.1 km/h
-      const speed = readInt16(resp, 7);
-      document.getElementById("valSpeed").textContent = speed !== null ? (speed/10).toFixed(1) + " km/h" : "–";
-
-      resp = await readRegister(0x3E, 1); // Temperatur 0.1 °C
-      const temp = readInt16(resp, 7);
-      document.getElementById("valTemp").textContent = temp !== null ? (temp/10).toFixed(1) + " °C" : "–";
-
-      resp = await readRegister(0x29, 2); // Gesamtkilometer, 32-bit, in Metern
-      if (resp && resp.length >= 9) {
-        const meters = (resp[7] | (resp[8] << 8) | (resp[9] << 16) | (resp[10] << 24)) >>> 0;
-        document.getElementById("valMileage").textContent = (meters/1000).toFixed(2) + " km";
-      }
-    } catch (error) {
-      log("Fehler beim Lesen: " + error);
-    }
-  });
-
-  document.getElementById("lightOnBtn").addEventListener("click", () => writeRegister(0x7D, 1));
-  document.getElementById("lightOffBtn").addEventListener("click", () => writeRegister(0x7D, 0));
-
-  document.getElementById("lockBtn").addEventListener("click", () => writeRegister(0x70, 1));
-  document.getElementById("unlockBtn").addEventListener("click", () => writeRegister(0x71, 1));
-
-  document.getElementById("modeNormalBtn").addEventListener("click", () => writeRegister(0x75, 0));
-  document.getElementById("modeEcoBtn").addEventListener("click", () => writeRegister(0x75, 1));
-  document.getElementById("modeSportBtn").addEventListener("click", () => writeRegister(0x75, 2));
-</script>
-
+        document.getElementById('speed25Btn').addEventListener('click', () => setSpeed(25));
+        document.getElementById('speed30Btn').addEventListener('click', () => setSpeed(30));
+        document.getElementById('panicBtn').addEventListener('click', () => setSpeed(20));
+    </script>
 </body>
 </html>
 
